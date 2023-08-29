@@ -1,0 +1,39 @@
+-Struct_chat() -> %{
+					users:%{}, 
+					messages:[]
+				}
+
+-Genserver init(state // %{users:%{}, messages:[]}) -> initial state or empty list
+-Genserver guarda os usuarios em State ou em struct
+	%{
+		user_name: user_name,
+		id: id
+	}
+	- Existe? -> username, id(criado)
+	-Nao existe? -> “usuario inexistente”
+
+-Crud user with id
+	-Add_user(user_name, id) 
+	-Remove_user(user_name, id)
+	
+
+-Messages
+	- Send_message(user_from, user_to, content)
+	  %{
+			user_from: user_from,
+			user_id_from: user_id_from,
+			user_to: user_to,
+			user_id_to: user_id_to,
+			content: “message”
+		}
+	- Receive_message
+		 %{
+			user_from: user_from,
+			user_id_from: user_id_from,
+			user_to: user_to,
+			user_id_to: user_id_to,
+			content: “message”
+		}
+
+-Parser_function()
+	-Tratar para qual id ou username esta direcionado aquela menssagem
