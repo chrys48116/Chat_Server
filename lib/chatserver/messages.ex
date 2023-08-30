@@ -5,9 +5,6 @@ defmodule ChatServer.Messages do
   def handle_message(:deleted, username) do
     IO.puts("#{username} has left the chat")
   end
-  # def handle_message(:not_found, username) do
-  #   {:error, "User with id #{username} not found"}
-  # end
   def handle_message(:sent) do
     IO.puts("Message sent")
   end

@@ -1,7 +1,7 @@
 defmodule ChatServer do
   use GenServer
 
-  alias ChatServer.Messages
+  alias ChatServer.Logic
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, initial_state(), name: __MODULE__)
@@ -9,8 +9,10 @@ defmodule ChatServer do
 
   defp initial_state() do
     %{
+      rooms: %{},
       users: %{},
-      messages: []
+      messages: [],
+      room_messages: %{}
     }
   end
 
@@ -23,6 +25,22 @@ defmodule ChatServer do
     GenServer.call(__MODULE__, :get_all_messages)
   end
 
+  def get_all_chats() do
+    GenServer.call(__MODULE__, :get_all_chats)
+  end
+
+  def get_users_in_room(room_name) do
+    GenServer.call(__MODULE__, {:get_users_in_room, room_name})
+  end
+
+  def get_messages_in_room(room_name) do
+    GenServer.call(__MODULE__, {:get_messages_in_room, room_name})
+  end
+
+  def create_room(room_name) do
+    GenServer.cast(__MODULE__, {:create_room, room_name})
+  end
+
   def add_user(user_id, username) do
     GenServer.cast(__MODULE__, {:add_user, user_id, username})
   end
@@ -31,20 +49,24 @@ defmodule ChatServer do
     GenServer.cast(__MODULE__, {:remove_user, user_id})
   end
 
-  def send_message(%{user_id_from: user_id_from, user_id_to: user_id_to, content: content}) do
-    GenServer.cast(__MODULE__, {:send_message, user_id_from, user_id_to, content})
+  def send_message(%{room_name: room_name, user_id_from: user_id_from, content: content}) do
+    GenServer.cast(__MODULE__, {:send_message, room_name, user_id_from, content})
   end
 
-  def receive_messages(user_id_to) do
-    GenServer.cast(__MODULE__, {:receive_messages, user_id_to})
+  def receive_messages(room_name) do
+    GenServer.cast(__MODULE__, {:receive_messages, room_name})
   end
 
-  defp user_exists(user_id_from, user_id_to, state) do
-    case {Map.get(state.users, user_id_from), Map.get(state.users, user_id_to)} do
-      {nil, _} ->  {:error, "User with id #{user_id_from} not found"}
-      {_, nil} ->  {:error, "User with id #{user_id_to} not found"}
-      {_, _} -> {:ok}
-    end
+  def join_room(user_id, room_name) do
+    GenServer.cast(__MODULE__, {:join_room, user_id, room_name})
+  end
+
+  def handle_call({:get_users_in_room, room_name}, _from, state) do
+    {:reply, Map.get(state.rooms, room_name, []), state}
+  end
+
+  def handle_call({:get_messages_in_room, room_name}, _from, state) do
+    {:reply, Map.get(state.room_messages, room_name, []), state}
   end
 
   def handle_call(:get_all_users, _from, state) do
@@ -55,62 +77,44 @@ defmodule ChatServer do
     {:reply, state.messages, state}
   end
 
-  def handle_cast({:send_message, user_id_from, user_id_to, content}, state) do
-    case user_exists(user_id_from, user_id_to, state) do
-      {:error, response} ->
-        IO.puts(response)
-        {:noreply, state}
-
-      {:ok} ->
-        message = %{user_id_from: user_id_from,
-                    from: Map.get(state.users, user_id_from),
-                    to: Map.get(state.users, user_id_to),
-                    user_id_to: user_id_to,
-                    content: content}
-        messages = [message | state.messages]
-        Messages.handle_message(:sent)
-        {:noreply, %{state | messages: messages}}
-    end
+  def handle_call(:get_all_chats, _from, state) do
+    {:reply, state.rooms, state}
   end
 
-  def handle_cast({:receive_messages, user_id}, state) do
-    state.messages
-    |> Enum.filter(fn
-      %{
-        user_id_to: user_id_to
-      } when user_id_to == user_id -> true
-      _ -> false
-    end)
-    |> Enum.each(fn message ->
-      Messages.handle_message(:received,
-                              Map.get(state.users, message.user_id_from),
-                              Map.get(state.users, user_id), message.content)
-    end)
-    {:noreply, state}
+  def handle_cast({:create_room, room_name}, state) do
+    room = Map.put(state.rooms, room_name, [])
+    {:noreply, %{state | rooms: room}}
+  end
+
+  def handle_cast({:join_room, user_id, room_name}, state) do
+    Logic.join_room(user_id, room_name, state)
+  end
+
+  def handle_cast({:send_message, room_name, user_id_from, content}, state) do
+    Logic.send_message(room_name, user_id_from, content, state)
+  end
+
+  def handle_cast({:receive_messages, room_name}, state) do
+    Logic.receive_messages(room_name, state)
   end
 
   def handle_cast({:add_user, user_id, username}, state) do
-    users = Map.put(state.users, user_id, username)
-    Messages.handle_message(:created, username)
-    {:noreply, %{state | users: users}}
+    Logic.add_user(user_id, username, state)
   end
 
   def handle_cast({:remove_user, user_id}, state) do
-    users = Map.delete(state.users, user_id)
-    Messages.handle_message(:deleted, state.users[user_id])
-    {:noreply, %{state | users: users}}
+    Logic.remove_user(user_id, state)
   end
 end
 
 
 
-
-# message_data3 = %{user_from: "chrystian",
-# user_id_from: 1,
-# user_to: "gabi",
-# user_id_to: 3,
-# content: "Hello Gabi!"
-# }
+message_data3 = %{user_from: "chrystian",
+user_id_from: 1,
+user_to: "gabi",
+user_id_to: 3,
+content: "Hello Gabi!"
+}
 message_data2 = %{user_from: "gabi",
 user_id_from: 2,
 user_to: "chrystian",
@@ -118,3 +122,11 @@ user_id_to: 1,
 content: "Hello Chrystian!"
 }
 ChatServer.add_user(1, "chrystian")
+ChatServer.create_room("room")
+ChatServer.join_room(1, "room")
+
+send_message = %{
+  room_name: "room",
+  user_id_from: 1,
+  content: "ola pessoal"
+}
