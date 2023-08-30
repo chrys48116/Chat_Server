@@ -4,7 +4,7 @@ defmodule ChatServer.Chat do
     ChatServer.create_room(room_name)
     ChatServer.join_room(user_id, room_name)
 
-    IO.puts("User_#{user_id} joined #{room_name}")
+    #IO.puts("User_#{user_id} joined #{room_name}")
 
     Task.async(fn -> receive_loop(user_id, room_name) end)
     send_loop(user_id, room_name)
